@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Peddle iLabs MeshNet</title>
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <main>
+    <h1>Peddle iLabs MeshNet</h1>
+    <p>Peer-to-peer learning resource distribution.</p>
+
+    <section class="card">
+      <label>Room <input id="room" value="meshnet-demo"></label>
+      <button id="join">Join network</button>
+      <p id="status">Disconnected</p>
+    </section>
+
+    <section class="card">
+      <h2>Peers</h2>
+      <ul id="peers"></ul>
+    </section>
+
+    <section class="card">
+      <h2>Resources</h2>
+      <p>This interface is the v0.4 shell. Resource discovery, cache and transfer modules are documented in the protocol layer.</p>
+    </section>
+  </main>
+  <script src="./app.js"></script>
+</body>
+</html>
