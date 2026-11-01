@@ -10,7 +10,8 @@ Current state of the repository, checked against the code.
 - **Resource model** (`web/resourceModel.js`): a file shared on this device is fingerprinted with SHA-256 (`sha256:<hex>`) and described with title, MIME type, size, chunk size and chunk count.
 - **Manifest exchange**: when two devices connect, each sends the list of resources it shares. Received lists are shown as unverified, because file contents are not transferred yet.
 - **Web client** (`web/`): join a room, see connected devices and their state, share a file, see the list of shared files.
-- **Tests** (`tests/`, run with `npm test`): 34 unit tests cover content IDs, chunk math, MIME normalization, message and signal validation (including location), the location storage client, and the connection state machine using a fake WebRTC connection.
+- **Resource transfer** (`web/fileTransfer.js`): a connected device can download a file offered in another device's list. Chunks are requested up to eight at a time over the direct connection. The finished file is checked against its SHA-256 fingerprint before a save link appears; a mismatch is discarded. Downloads stop if the connection drops.
+- **Tests** (`tests/`, run with `npm test`): 45 unit tests cover content IDs, chunk math, MIME normalization, message and signal validation (including location and chunk messages), the chunk downloader and its fingerprint check, the location storage client, and the connection state machine using a fake WebRTC connection.
 - **Live location map** (`web/locationMap.js`, `web/deviceLocation.js`): opt-in location sharing. Each device's location is sent over its direct connections only and shown on a map with a marker per device. The map uses Leaflet and OpenStreetMap tiles loaded from the internet. Locations are self-reported and not verified.
 - **Last known location** (`server/deviceLocationStore.js`, `web/locationStore.js`): while sharing is on, the location is saved to Supabase through the signaling server, at most every 30 seconds. A random device key is kept in the browser, and the server stores only a SHA-256 hash of it. On return, the saved location is restored, and sharing resumes if it was on. Stopping sharing deletes the saved location.
 
@@ -29,7 +30,6 @@ Current state of the repository, checked against the code.
 
 ## Missing
 
-- **Resource transfer**: no chunk requests, no chunk transfer, no verification of received contents against the declared SHA-256.
 - **Local cache**: nothing is stored. Shared files exist only while the page is open.
 - **Store-and-forward**: devices do not re-advertise resources they received.
 - **STUN and TURN**: connections use only addresses on the same network. Devices on different networks cannot connect yet.
@@ -47,4 +47,4 @@ Current state of the repository, checked against the code.
 
 ## Next steps
 
-Resource transfer over the existing data channel, with chunked requests and SHA-256 verification before a file is stored. After that: a local cache, STUN/TURN configuration for connections across networks, and server-side validation of signaling messages.
+Connection retries and STUN/TURN configuration for connections across networks. After that: a local cache that keeps shared files between sessions, and server-side validation of signaling messages.

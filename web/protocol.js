@@ -7,7 +7,13 @@ import {
 } from "./resourceModel.js";
 
 export const PROTOCOL_VERSION = 1;
-export const MESSAGE_TYPES = Object.freeze({ MANIFEST: "manifest", LOCATION: "location" });
+export const MESSAGE_TYPES = Object.freeze({
+  MANIFEST: "manifest",
+  LOCATION: "location",
+  CHUNK_REQUEST: "chunk-request",
+  CHUNK: "chunk",
+  CHUNK_UNAVAILABLE: "chunk-unavailable",
+});
 export const MAX_DATA_MESSAGE_BYTES = 256 * 1024;
 
 const MAX_RESOURCES_PER_MANIFEST = 500;
@@ -18,6 +24,7 @@ const MAX_SIGNAL_SDP_LENGTH = 64 * 1024;
 const MAX_CANDIDATE_LENGTH = 2048;
 const MAX_SDP_MID_LENGTH = 32;
 const CONTENT_ID_PATTERN = /^sha256:[0-9a-f]{64}$/;
+const BASE64_PATTERN = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/;
 
 export class ProtocolError extends Error {
   name = "ProtocolError";
@@ -101,6 +108,11 @@ function validatePayload(type, payload) {
       return validateManifestPayload(payload);
     case MESSAGE_TYPES.LOCATION:
       return validateLocationPayload(payload);
+    case MESSAGE_TYPES.CHUNK_REQUEST:
+    case MESSAGE_TYPES.CHUNK_UNAVAILABLE:
+      return validateChunkReferencePayload(payload);
+    case MESSAGE_TYPES.CHUNK:
+      return validateChunkPayload(payload);
     default:
       return fail("Unknown message type");
   }
@@ -130,6 +142,25 @@ export function validateLocationPayload(payload) {
   };
 }
 
+function requireContentId(source) {
+  const contentId = requireString(source, "contentId", 80);
+  if (!CONTENT_ID_PATTERN.test(contentId)) fail("contentId must be a sha256 content identifier");
+  return contentId;
+}
+
+function validateChunkReferencePayload(payload) {
+  return {
+    contentId: requireContentId(payload),
+    index: requireInteger(payload, "index", 0, Number.MAX_SAFE_INTEGER),
+  };
+}
+
+function validateChunkPayload(payload) {
+  const data = requireString(payload, "data", MAX_DATA_MESSAGE_BYTES);
+  if (!BASE64_PATTERN.test(data)) fail("data must be base64");
+  return { ...validateChunkReferencePayload(payload), data };
+}
+
 function validateResource(resource) {
   if (!isPlainObject(resource)) fail("Resource must be an object");
 
@@ -140,8 +171,7 @@ function validateResource(resource) {
     fail("totalChunks does not match size and chunkSize");
   }
 
-  const contentId = requireString(resource, "contentId", 80);
-  if (!CONTENT_ID_PATTERN.test(contentId)) fail("contentId must be a sha256 content identifier");
+  const contentId = requireContentId(resource);
 
   const mimeType = requireString(resource, "mimeType", 127);
   if (!MIME_TYPE_PATTERN.test(mimeType)) fail("mimeType is not a valid MIME type");

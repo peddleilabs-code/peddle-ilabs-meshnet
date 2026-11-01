@@ -36,19 +36,17 @@ Typical control messages include:
 
 ## Transfer
 
-Each chunk has:
+A device downloads a file by asking for its chunks one at a time, up to eight requests at once. Each message is sent over the existing direct connection:
 
-- transfer ID
-- content ID
-- chunk index
-- total chunks
-- binary payload
+- `chunk-request` with `{ contentId, index }`: asks the file's owner for one chunk.
+- `chunk` with `{ contentId, index, data }`: carries one chunk, base64-encoded. Chunks are 16 KB before encoding.
+- `chunk-unavailable` with `{ contentId, index }`: the owner no longer has that file or chunk, and the download stops.
 
-The receiver persists completed chunks and can reconstruct the resource after all chunks arrive.
+A chunk is accepted only if it was requested and has the expected size. The receiver keeps completed chunks in memory until the whole file has arrived.
 
 ## Integrity
 
-The final reconstructed resource must match the advertised SHA-256 content ID before it is committed as complete.
+The final reconstructed resource must match the advertised SHA-256 content ID before it is offered for saving. A file that does not match is discarded.
 
 ## Location storage (HTTP)
 

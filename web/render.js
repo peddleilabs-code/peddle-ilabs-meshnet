@@ -31,15 +31,39 @@ function element(tag, className, text) {
   return node;
 }
 
-function resourceItem(resource, note) {
+function resourceItem(resource, note, controls = []) {
   const item = element("li", "resource");
   item.append(
     element("strong", "", resource.title),
     element("span", "meta", `${formatBytes(resource.size)} · ${resource.mimeType}`),
     element("code", "", resource.contentId),
     element("span", "meta", note),
+    ...controls,
   );
   return item;
+}
+
+function transferControls(peerId, resource, download, onDownload) {
+  const status = download?.state.status;
+  if (status === "complete") {
+    const link = element("a", "link-button", "Save file");
+    link.href = download.state.url;
+    link.download = resource.title;
+    return [link];
+  }
+  if (status === "verifying") return [element("span", "meta", "Checking the fingerprint...")];
+  if (status === "downloading") {
+    return [element("span", "meta", `Downloading: ${download.state.received} of ${download.state.total} pieces received.`)];
+  }
+
+  const controls = [];
+  if (status === "failed") controls.push(element("p", "error", download.state.error));
+  const button = element("button", "", status === "failed" ? "Try again" : "Download");
+  button.type = "button";
+  button.setAttribute("aria-label", `Download ${resource.title}`);
+  button.addEventListener("click", () => onDownload(peerId, resource));
+  controls.push(button);
+  return controls;
 }
 
 function emptyItem(text) {
@@ -48,7 +72,7 @@ function emptyItem(text) {
 
 export function renderLocalResources(container, entries) {
   const items = entries.map(({ resource }) =>
-    resourceItem(resource, "Shared with connected devices. Contents are not transferred yet."),
+    resourceItem(resource, "Shared with connected devices, which can download it."),
   );
   container.replaceChildren(...(items.length ? items : [emptyItem("No files shared yet.")]));
 }
@@ -59,7 +83,7 @@ function locationSummary(location) {
   return `Sharing location, accurate to about ${Math.round(location.accuracy)} m, updated ${time}.`;
 }
 
-function peerItem(peerId, entry) {
+function peerItem(peerId, entry, onDownload) {
   const item = element("li", "peer");
   const header = element("div", "peer-header");
   const badge = element("span", `badge state-${entry.state.toLowerCase()}`, STATE_LABELS[entry.state]);
@@ -80,7 +104,11 @@ function peerItem(peerId, entry) {
     const list = element("ul", "list nested");
     list.append(
       ...entry.resources.map((resource) =>
-        resourceItem(resource, "Offered by this device. Not verified until its contents are received."),
+        resourceItem(
+          resource,
+          "Offered by this device.",
+          transferControls(peerId, resource, entry.downloads.get(resource.contentId), onDownload),
+        ),
       ),
     );
     item.append(list);
@@ -88,7 +116,7 @@ function peerItem(peerId, entry) {
   return item;
 }
 
-export function renderPeers(container, peers) {
-  const items = [...peers].map(([peerId, entry]) => peerItem(peerId, entry));
+export function renderPeers(container, peers, { onDownload }) {
+  const items = [...peers].map(([peerId, entry]) => peerItem(peerId, entry, onDownload));
   container.replaceChildren(...(items.length ? items : [emptyItem("No other devices connected yet.")]));
 }

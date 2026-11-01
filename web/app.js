@@ -3,6 +3,7 @@ import { decodeMessage, encodeMessage, MESSAGE_TYPES, PROTOCOL_VERSION, validate
 import { MeshPeerConnection, PeerState } from "./meshPeerConnection.js";
 import { watchDeviceLocation } from "./deviceLocation.js";
 import { createLocationMap } from "./locationMap.js";
+import { createDownload, readChunk, bytesToBase64 } from "./fileTransfer.js";
 import { displayDeviceId, renderLocalResources, renderPeers } from "./render.js";
 import {
   clearLastLocation,
@@ -55,7 +56,7 @@ function setStatus(text) {
 }
 
 function refreshViews() {
-  renderPeers(elements.peers, peers);
+  renderPeers(elements.peers, peers, { onDownload: startDownload });
   locationMap?.update(mapDevices());
 }
 
@@ -165,6 +166,7 @@ function createPeer(remotePeerId, isInitiator) {
     error: null,
     resources: null,
     location: null,
+    downloads: new Map(),
   });
   refreshViews();
   void connection.start();
@@ -174,6 +176,7 @@ function removePeer(remotePeerId) {
   const entry = peers.get(remotePeerId);
   if (!entry) return;
   peers.delete(remotePeerId);
+  discardDownloads(entry);
   entry.connection.close();
   refreshViews();
 }
@@ -216,6 +219,7 @@ function handlePeerState(remotePeerId, { state, reason }) {
   } else {
     entry.resources = null;
     entry.location = null;
+    discardDownloads(entry);
   }
   refreshViews();
 }
@@ -235,8 +239,53 @@ function handlePeerMessage(remotePeerId, raw) {
     entry.resources = message.payload.resources;
   } else if (message.type === MESSAGE_TYPES.LOCATION) {
     entry.location = message.payload.location;
+  } else if (message.type === MESSAGE_TYPES.CHUNK_REQUEST) {
+    void serveChunk(entry.connection, message.payload);
+  } else if (message.type === MESSAGE_TYPES.CHUNK) {
+    entry.downloads.get(message.payload.contentId)?.receiveChunk(message.payload.index, message.payload.data);
+  } else if (message.type === MESSAGE_TYPES.CHUNK_UNAVAILABLE) {
+    entry.downloads
+      .get(message.payload.contentId)
+      ?.abort("The device no longer has this file.");
   }
   refreshViews();
+}
+
+async function serveChunk(connection, { contentId, index }) {
+  const shared = localResources.find(({ resource }) => resource.contentId === contentId);
+  if (!shared || index >= shared.resource.totalChunks) {
+    connection.send(encodeMessage(MESSAGE_TYPES.CHUNK_UNAVAILABLE, { contentId, index }));
+    return;
+  }
+  try {
+    const bytes = await readChunk(shared.file, shared.resource.chunkSize, index);
+    connection.send(encodeMessage(MESSAGE_TYPES.CHUNK, { contentId, index, data: bytesToBase64(bytes) }));
+  } catch {
+    connection.send(encodeMessage(MESSAGE_TYPES.CHUNK_UNAVAILABLE, { contentId, index }));
+  }
+}
+
+function startDownload(peerId, resource) {
+  const entry = peers.get(peerId);
+  if (entry?.state !== PeerState.CONNECTED) return;
+  const existing = entry.downloads.get(resource.contentId);
+  if (existing && existing.state.status !== "failed") return;
+
+  existing?.dispose();
+  const download = createDownload({
+    resource,
+    requestChunk: (index) =>
+      entry.connection.send(encodeMessage(MESSAGE_TYPES.CHUNK_REQUEST, { contentId: resource.contentId, index })),
+    onChange: refreshViews,
+  });
+  entry.downloads.set(resource.contentId, download);
+  download.start();
+  refreshViews();
+}
+
+function discardDownloads(entry) {
+  for (const download of entry.downloads.values()) download.dispose();
+  entry.downloads.clear();
 }
 
 function sendManifest(connection) {
