@@ -1,6 +1,8 @@
 import { createResourceFromFile } from "./resourceModel.js";
 import { decodeMessage, encodeMessage, MESSAGE_TYPES, PROTOCOL_VERSION, validateSignal } from "./protocol.js";
 import { MeshPeerConnection, PeerState } from "./meshPeerConnection.js";
+import { watchDeviceLocation } from "./deviceLocation.js";
+import { createLocationMap } from "./locationMap.js";
 import { displayDeviceId, renderLocalResources, renderPeers } from "./render.js";
 
 const SIGNALING_PORT = 8080;
@@ -15,26 +17,51 @@ const elements = {
   shareStatus: document.querySelector("#share-status"),
   localResources: document.querySelector("#local-resources"),
   peers: document.querySelector("#peers"),
+  locationToggle: document.querySelector("#location-toggle"),
+  locationStatus: document.querySelector("#location-status"),
+  map: document.querySelector("#map"),
 };
 
 const localPeerId = crypto.randomUUID();
 const localResources = [];
 const peers = new Map();
 let signaling = null;
+let localLocation = null;
+let stopWatchingLocation = null;
+const locationMap = createLocationMap(elements.map);
 
 elements.deviceId.textContent = displayDeviceId(localPeerId);
-renderLocalResources(elements.localResources, localResources);
-renderPeers(elements.peers, peers);
+refreshViews();
 
 elements.join.addEventListener("click", () => (signaling ? leaveRoom() : joinRoom()));
 elements.share.addEventListener("change", shareSelectedFile);
+elements.locationToggle.addEventListener("click", () => (stopWatchingLocation ? stopSharingLocation() : startSharingLocation()));
 
 function setStatus(text) {
   elements.status.textContent = text;
 }
 
-function renderPeerList() {
+function refreshViews() {
   renderPeers(elements.peers, peers);
+  locationMap?.update(mapDevices());
+}
+
+function mapDevices() {
+  const devices = [];
+  if (localLocation) {
+    devices.push({
+      id: localPeerId,
+      label: `${displayDeviceId(localPeerId)} (you)`,
+      isSelf: true,
+      ...localLocation,
+    });
+  }
+  for (const [peerId, entry] of peers) {
+    if (entry.location) {
+      devices.push({ id: peerId, label: displayDeviceId(peerId), isSelf: false, ...entry.location });
+    }
+  }
+  return devices;
 }
 
 function joinRoom() {
@@ -115,12 +142,18 @@ function createPeer(remotePeerId, isInitiator) {
   const connection = new MeshPeerConnection({
     remotePeerId,
     isInitiator,
-    sendSignal: sendSignal,
+    sendSignal,
     onStateChange: (change) => handlePeerState(remotePeerId, change),
     onMessage: (raw) => handlePeerMessage(remotePeerId, raw),
   });
-  peers.set(remotePeerId, { connection, state: PeerState.DISCOVERING, error: null, resources: null });
-  renderPeerList();
+  peers.set(remotePeerId, {
+    connection,
+    state: PeerState.DISCOVERING,
+    error: null,
+    resources: null,
+    location: null,
+  });
+  refreshViews();
   void connection.start();
 }
 
@@ -129,7 +162,7 @@ function removePeer(remotePeerId) {
   if (!entry) return;
   peers.delete(remotePeerId);
   entry.connection.close();
-  renderPeerList();
+  refreshViews();
 }
 
 function closeAllPeers() {
@@ -166,10 +199,12 @@ function handlePeerState(remotePeerId, { state, reason }) {
   entry.error = reason;
   if (state === PeerState.CONNECTED) {
     sendManifest(entry.connection);
+    sendLocation(entry.connection);
   } else {
     entry.resources = null;
+    entry.location = null;
   }
-  renderPeerList();
+  refreshViews();
 }
 
 function handlePeerMessage(remotePeerId, raw) {
@@ -181,9 +216,14 @@ function handlePeerMessage(remotePeerId, raw) {
     return;
   }
   const entry = peers.get(remotePeerId);
-  if (!entry || message.type !== MESSAGE_TYPES.MANIFEST) return;
-  entry.resources = message.payload.resources;
-  renderPeerList();
+  if (!entry) return;
+
+  if (message.type === MESSAGE_TYPES.MANIFEST) {
+    entry.resources = message.payload.resources;
+  } else if (message.type === MESSAGE_TYPES.LOCATION) {
+    entry.location = message.payload.location;
+  }
+  refreshViews();
 }
 
 function sendManifest(connection) {
@@ -199,6 +239,42 @@ function broadcastManifest() {
   for (const entry of peers.values()) {
     if (entry.state === PeerState.CONNECTED) sendManifest(entry.connection);
   }
+}
+
+function sendLocation(connection) {
+  connection.send(encodeMessage(MESSAGE_TYPES.LOCATION, { location: localLocation }));
+}
+
+function broadcastLocation() {
+  for (const entry of peers.values()) {
+    if (entry.state === PeerState.CONNECTED) sendLocation(entry.connection);
+  }
+}
+
+function startSharingLocation() {
+  elements.locationToggle.textContent = "Stop sharing location";
+  elements.locationStatus.textContent = "Finding your location...";
+  stopWatchingLocation = watchDeviceLocation({
+    onPosition: (position) => {
+      localLocation = position;
+      elements.locationStatus.textContent = "Sharing your location with connected devices.";
+      broadcastLocation();
+      refreshViews();
+    },
+    onError: (message) => {
+      elements.locationStatus.textContent = message;
+    },
+  });
+}
+
+function stopSharingLocation() {
+  stopWatchingLocation();
+  stopWatchingLocation = null;
+  localLocation = null;
+  elements.locationToggle.textContent = "Share my location";
+  elements.locationStatus.textContent = "Location sharing is off.";
+  broadcastLocation();
+  refreshViews();
 }
 
 async function shareSelectedFile() {

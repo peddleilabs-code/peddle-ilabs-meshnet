@@ -7,10 +7,11 @@ import {
 } from "./resourceModel.js";
 
 export const PROTOCOL_VERSION = 1;
-export const MESSAGE_TYPES = Object.freeze({ MANIFEST: "manifest" });
+export const MESSAGE_TYPES = Object.freeze({ MANIFEST: "manifest", LOCATION: "location" });
 export const MAX_DATA_MESSAGE_BYTES = 256 * 1024;
 
 const MAX_RESOURCES_PER_MANIFEST = 500;
+export const MAX_ACCURACY_METERS = 100_000;
 const MAX_ID_LENGTH = 128;
 const MAX_LANGUAGE_LENGTH = 35;
 const MAX_SIGNAL_SDP_LENGTH = 64 * 1024;
@@ -42,6 +43,14 @@ function requireInteger(source, key, min, max) {
   const value = source[key];
   if (!Number.isInteger(value) || value < min || value > max) {
     fail(`${key} must be a whole number from ${min} to ${max}`);
+  }
+  return value;
+}
+
+function requireNumber(source, key, min, max) {
+  const value = source[key];
+  if (typeof value !== "number" || !Number.isFinite(value) || value < min || value > max) {
+    fail(`${key} must be a number from ${min} to ${max}`);
   }
   return value;
 }
@@ -90,6 +99,8 @@ function validatePayload(type, payload) {
   switch (type) {
     case MESSAGE_TYPES.MANIFEST:
       return validateManifestPayload(payload);
+    case MESSAGE_TYPES.LOCATION:
+      return validateLocationPayload(payload);
     default:
       return fail("Unknown message type");
   }
@@ -103,6 +114,19 @@ function validateManifestPayload(payload) {
   return {
     protocolVersion: PROTOCOL_VERSION,
     resources: payload.resources.map(validateResource),
+  };
+}
+
+function validateLocationPayload(payload) {
+  if (payload.location === null) return { location: null };
+  if (!isPlainObject(payload.location)) fail("location must be an object or null");
+  return {
+    location: {
+      latitude: requireNumber(payload.location, "latitude", -90, 90),
+      longitude: requireNumber(payload.location, "longitude", -180, 180),
+      accuracy: requireNumber(payload.location, "accuracy", 0, MAX_ACCURACY_METERS),
+      capturedAt: requireTimestamp(payload.location, "capturedAt"),
+    },
   };
 }
 

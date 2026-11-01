@@ -4,6 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Peddle iLabs MeshNet</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="./style.css" />
   </head>
   <body>
@@ -32,11 +33,22 @@
         <ul id="local-resources" class="list"></ul>
       </section>
 
+      <section class="card" aria-labelledby="location-title">
+        <h2 id="location-title">Location</h2>
+        <p>Your location is sent only to devices you are directly connected to. It is not stored on any server.</p>
+        <div class="row">
+          <button id="location-toggle" type="button">Share my location</button>
+        </div>
+        <p id="location-status" class="meta" role="status">Location sharing is off.</p>
+        <div id="map" class="map" aria-label="Map of connected devices"></div>
+      </section>
+
       <section class="card" aria-labelledby="devices-title">
         <h2 id="devices-title">Devices</h2>
         <ul id="peers" class="list"></ul>
       </section>
     </main>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script type="module" src="./app.js"></script>
   </body>
 </html>

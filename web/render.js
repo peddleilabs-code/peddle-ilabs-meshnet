@@ -53,6 +53,12 @@ export function renderLocalResources(container, entries) {
   container.replaceChildren(...(items.length ? items : [emptyItem("No files shared yet.")]));
 }
 
+function locationSummary(location) {
+  if (!location) return "Not sharing location.";
+  const time = new Date(location.capturedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  return `Sharing location, accurate to about ${Math.round(location.accuracy)} m, updated ${time}.`;
+}
+
 function peerItem(peerId, entry) {
   const item = element("li", "peer");
   const header = element("div", "peer-header");
@@ -63,6 +69,8 @@ function peerItem(peerId, entry) {
   if (entry.error) item.append(element("p", "error", entry.error));
 
   if (entry.state !== PeerState.CONNECTED) return item;
+
+  item.append(element("p", "meta", locationSummary(entry.location)));
 
   if (entry.resources === null) {
     item.append(element("p", "meta", "Waiting for the resource list."));

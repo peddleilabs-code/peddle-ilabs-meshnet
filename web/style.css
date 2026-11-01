@@ -206,6 +206,20 @@ code {
   margin: 8px 0 0;
 }
 
+.map {
+  height: 360px;
+  margin-top: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--muted);
+}
+
+.map:empty::before {
+  content: "Loading map...";
+  display: block;
+  padding: 16px;
+}
+
 @media (max-width: 600px) {
   body {
     padding: 24px 12px;

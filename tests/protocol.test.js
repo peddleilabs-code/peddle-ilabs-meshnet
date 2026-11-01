@@ -84,3 +84,35 @@ test("ICE signals accept end-of-candidates and reject malformed candidates", () 
   });
   assert.throws(() => validateSignal({ type: "ice", from: "peer-a", candidate: "candidate:1" }), ProtocolError);
 });
+
+const locationRaw = (location) =>
+  JSON.stringify({
+    type: "location",
+    messageId: "m-2",
+    timestamp: "2026-11-01T00:00:00.000Z",
+    payload: { location },
+  });
+
+const validLocation = () => ({
+  latitude: 51.5,
+  longitude: -0.12,
+  accuracy: 25,
+  capturedAt: "2026-11-01T00:00:00.000Z",
+});
+
+test("a location update survives encoding and decoding", () => {
+  const decoded = decodeMessage(encodeMessage(MESSAGE_TYPES.LOCATION, { location: validLocation() }));
+  assert.deepEqual(decoded.payload.location, validLocation());
+});
+
+test("a null location means the device has stopped sharing", () => {
+  assert.deepEqual(decodeMessage(locationRaw(null)).payload, { location: null });
+});
+
+test("out-of-range coordinates and accuracy are rejected", () => {
+  assert.throws(() => decodeMessage(locationRaw({ ...validLocation(), latitude: 91 })), ProtocolError);
+  assert.throws(() => decodeMessage(locationRaw({ ...validLocation(), longitude: -181 })), ProtocolError);
+  assert.throws(() => decodeMessage(locationRaw({ ...validLocation(), accuracy: -1 })), ProtocolError);
+  assert.throws(() => decodeMessage(locationRaw({ ...validLocation(), latitude: "51.5" })), ProtocolError);
+});
+
