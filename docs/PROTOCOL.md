@@ -50,6 +50,16 @@ The receiver persists completed chunks and can reconstruct the resource after al
 
 The final reconstructed resource must match the advertised SHA-256 content ID before it is committed as complete.
 
+## Location storage (HTTP)
+
+The signaling server exposes three routes for each device's last known location. All accept JSON bodies up to 4 KB, return JSON, and allow CORS from any origin.
+
+- `POST /api/device-location/save` with `{ deviceKey, location }`, where `location` is `{ latitude, longitude, accuracy, capturedAt }`. Returns `{ ok: true }`.
+- `POST /api/device-location/load` with `{ deviceKey }`. Returns `{ location }`, which is `null` when nothing is saved.
+- `POST /api/device-location/clear` with `{ deviceKey }`. Returns `{ ok: true }`.
+
+`deviceKey` is a private string of 16 to 128 characters kept in the browser. The server hashes it before it reaches the database, so only the hash is stored. Responses are `400` for invalid input, `502` when the database call fails, and `503` when the server has no database configuration.
+
 ## Future protocol work
 
 Future versions may add:

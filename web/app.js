@@ -4,8 +4,17 @@ import { MeshPeerConnection, PeerState } from "./meshPeerConnection.js";
 import { watchDeviceLocation } from "./deviceLocation.js";
 import { createLocationMap } from "./locationMap.js";
 import { displayDeviceId, renderLocalResources, renderPeers } from "./render.js";
+import {
+  clearLastLocation,
+  createThrottledSaver,
+  getOrCreateDeviceKey,
+  loadLastLocation,
+  readSharingPreference,
+  saveLastLocation,
+  writeSharingPreference,
+} from "./locationStore.js";
+import { SIGNALING_PORT } from "./serverConfig.js";
 
-const SIGNALING_PORT = 8080;
 const DEFAULT_ROOM = "meshnet-demo";
 
 const elements = {
@@ -23,15 +32,19 @@ const elements = {
 };
 
 const localPeerId = crypto.randomUUID();
+const deviceKey = getOrCreateDeviceKey();
 const localResources = [];
 const peers = new Map();
 let signaling = null;
 let localLocation = null;
 let stopWatchingLocation = null;
 const locationMap = createLocationMap(elements.map);
+const locationSaver = createThrottledSaver(persistLocation);
 
 elements.deviceId.textContent = displayDeviceId(localPeerId);
 refreshViews();
+if (readSharingPreference()) startSharingLocation();
+void restoreLastLocation();
 
 elements.join.addEventListener("click", () => (signaling ? leaveRoom() : joinRoom()));
 elements.share.addEventListener("change", shareSelectedFile);
@@ -251,13 +264,39 @@ function broadcastLocation() {
   }
 }
 
+async function restoreLastLocation() {
+  try {
+    const saved = await loadLastLocation(deviceKey);
+    if (!saved) return;
+    if (stopWatchingLocation) {
+      localLocation ??= saved;
+      broadcastLocation();
+      refreshViews();
+      return;
+    }
+    elements.locationStatus.textContent = `Last known location saved ${new Date(saved.capturedAt).toLocaleString()}. Sharing is off.`;
+  } catch (error) {
+    if (!stopWatchingLocation) {
+      elements.locationStatus.textContent = `Could not load your last known location: ${error.message}`;
+    }
+  }
+}
+
+function persistLocation(location) {
+  saveLastLocation(deviceKey, location).catch((error) => {
+    elements.locationStatus.textContent = `Your location could not be saved: ${error.message}`;
+  });
+}
+
 function startSharingLocation() {
+  writeSharingPreference(true);
   elements.locationToggle.textContent = "Stop sharing location";
   elements.locationStatus.textContent = "Finding your location...";
   stopWatchingLocation = watchDeviceLocation({
     onPosition: (position) => {
       localLocation = position;
       elements.locationStatus.textContent = "Sharing your location with connected devices.";
+      locationSaver.schedule(position);
       broadcastLocation();
       refreshViews();
     },
@@ -270,11 +309,16 @@ function startSharingLocation() {
 function stopSharingLocation() {
   stopWatchingLocation();
   stopWatchingLocation = null;
+  locationSaver.cancel();
+  writeSharingPreference(false);
   localLocation = null;
   elements.locationToggle.textContent = "Share my location";
   elements.locationStatus.textContent = "Location sharing is off.";
   broadcastLocation();
   refreshViews();
+  clearLastLocation(deviceKey).catch((error) => {
+    elements.locationStatus.textContent = `Your saved location could not be cleared: ${error.message}`;
+  });
 }
 
 async function shareSelectedFile() {

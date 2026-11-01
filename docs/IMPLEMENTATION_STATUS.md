@@ -10,8 +10,9 @@ Current state of the repository, checked against the code.
 - **Resource model** (`web/resourceModel.js`): a file shared on this device is fingerprinted with SHA-256 (`sha256:<hex>`) and described with title, MIME type, size, chunk size and chunk count.
 - **Manifest exchange**: when two devices connect, each sends the list of resources it shares. Received lists are shown as unverified, because file contents are not transferred yet.
 - **Web client** (`web/`): join a room, see connected devices and their state, share a file, see the list of shared files.
-- **Tests** (`tests/`, run with `npm test`): 25 unit tests cover content IDs, chunk math, MIME normalization, message and signal validation (including location), and the connection state machine using a fake WebRTC connection.
+- **Tests** (`tests/`, run with `npm test`): 34 unit tests cover content IDs, chunk math, MIME normalization, message and signal validation (including location), the location storage client, and the connection state machine using a fake WebRTC connection.
 - **Live location map** (`web/locationMap.js`, `web/deviceLocation.js`): opt-in location sharing. Each device's location is sent over its direct connections only and shown on a map with a marker per device. The map uses Leaflet and OpenStreetMap tiles loaded from the internet. Locations are self-reported and not verified.
+- **Last known location** (`server/deviceLocationStore.js`, `web/locationStore.js`): while sharing is on, the location is saved to Supabase through the signaling server, at most every 30 seconds. A random device key is kept in the browser, and the server stores only a SHA-256 hash of it. On return, the saved location is restored, and sharing resumes if it was on. Stopping sharing deletes the saved location.
 
 ## Partially implemented
 
@@ -20,6 +21,7 @@ Current state of the repository, checked against the code.
 - **Signaling port**: the web client connects to port `8080` on the same host. Serving the page from another origin or behind a proxy will not work.
 - **Health endpoint**: returns only the service name and version, not room or peer counts.
 - **Reconnection**: a connection that fails or drops is not retried automatically. A device must leave and rejoin.
+- **Location storage configuration**: the server needs `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`. Without them the location routes return 503 and the page shows an error. Not yet tested end to end against a running server.
 
 ## Not yet verified
 
@@ -33,7 +35,6 @@ Current state of the repository, checked against the code.
 - **STUN and TURN**: connections use only addresses on the same network. Devices on different networks cannot connect yet.
 - **Server-side validation**: the signaling server forwards arbitrary JSON, does not limit message size, and does not check sender identity beyond the room.
 - **Learning features**: recommendations, progress tracking, and dashboards.
-- **Location history**: locations are live only; nothing is saved between sessions.
 - **Build and deployment**: no Vite build, no TypeScript, no Dockerfile, no `.env.example`.
 - **Documentation**: `docs/ARCHITECTURE.md`, `docs/PROTOCOL.md`, `docs/VERSION_HISTORY.md` and the v0.3 and v0.4 READMEs still describe features that are not built yet.
 

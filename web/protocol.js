@@ -117,7 +117,7 @@ function validateManifestPayload(payload) {
   };
 }
 
-function validateLocationPayload(payload) {
+export function validateLocationPayload(payload) {
   if (payload.location === null) return { location: null };
   if (!isPlainObject(payload.location)) fail("location must be an object or null");
   return {
