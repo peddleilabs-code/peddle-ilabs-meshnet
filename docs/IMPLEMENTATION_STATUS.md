@@ -11,9 +11,9 @@ Current state of the repository, checked against the code.
 - **Manifest exchange**: when two devices connect, each sends the list of resources it shares. Received lists are shown as unverified, because file contents are not transferred yet.
 - **Web client** (`web/`): join a room, see connected devices and their state, share a file, see the list of shared files.
 - **Resource transfer** (`web/fileTransfer.js`): a connected device can download a file offered in another device's list. Chunks are requested up to eight at a time over the direct connection. The finished file is checked against its SHA-256 fingerprint before a save link appears; a mismatch is discarded. Downloads stop if the connection drops.
-- **Tests** (`tests/`, run with `npm test`): 45 unit tests cover content IDs, chunk math, MIME normalization, message and signal validation (including location and chunk messages), the chunk downloader and its fingerprint check, the location storage client, and the connection state machine using a fake WebRTC connection.
+- **Tests** (`tests/`, run with `npm test`): 36 unit tests cover content IDs, chunk math, MIME normalization, message and signal validation (including location and chunk messages), and the chunk downloader and its fingerprint check, and the connection state machine using a fake WebRTC connection.
 - **Live location map** (`web/locationMap.js`, `web/deviceLocation.js`): opt-in location sharing. Each device's location is sent over its direct connections only and shown on a map with a marker per device. The map uses Leaflet and OpenStreetMap tiles loaded from the internet. Locations are self-reported and not verified.
-- **Last known location** (`server/deviceLocationStore.js`, `web/locationStore.js`): while sharing is on, the location is saved to Supabase through the signaling server, at most every 30 seconds. A random device key is kept in the browser, and the server stores only a SHA-256 hash of it. On return, the saved location is restored, and sharing resumes if it was on. Stopping sharing deletes the saved location.
+- **Last known location** (`supabase/functions/device-location/index.ts`, `web/locationStore.js`): while sharing is on, the location is saved to Supabase through an edge function, at most every 30 seconds. A random device key is kept in the browser, and the database stores only a SHA-256 hash of it. On return, the saved location is restored, and sharing resumes if it was on. Stopping sharing deletes the saved location.
 
 ## Partially implemented
 
@@ -22,7 +22,6 @@ Current state of the repository, checked against the code.
 - **Signaling port**: the web client connects to port `8080` on the same host. Serving the page from another origin or behind a proxy will not work.
 - **Health endpoint**: returns only the service name and version, not room or peer counts.
 - **Reconnection**: a connection that fails or drops is not retried automatically. A device must leave and rejoin.
-- **Location storage configuration**: the server needs `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`. Without them the location routes return 503 and the page shows an error. Not yet tested end to end against a running server.
 
 ## Not yet verified
 

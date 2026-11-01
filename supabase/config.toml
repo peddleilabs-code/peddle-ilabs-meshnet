@@ -1,0 +1,2 @@
+[functions.device-location]
+verify_jwt = false

@@ -1,8 +1,9 @@
 import { validateLocationPayload } from "./protocol.js";
-import { SIGNALING_PORT } from "./serverConfig.js";
 
 const DEVICE_KEY_STORAGE = "meshnet.deviceKey";
 const SHARING_STORAGE = "meshnet.locationSharing";
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 export const SAVE_INTERVAL_MS = 30_000;
 
@@ -24,15 +25,18 @@ export function writeSharingPreference(enabled) {
 }
 
 function locationApiUrl(action) {
-  const protocol = location.protocol === "https:" ? "https:" : "http:";
-  const host = location.hostname || "localhost";
-  return `${protocol}//${host}:${SIGNALING_PORT}/api/device-location/${action}`;
+  return `${SUPABASE_URL}/functions/v1/device-location/${action}`;
 }
 
 async function postLocationRequest(action, body) {
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) throw new Error("Location storage is not configured.");
   const response = await fetch(locationApiUrl(action), {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+      apikey: SUPABASE_ANON_KEY,
+    },
     body: JSON.stringify(body),
   });
   const payload = await response.json().catch(() => null);

@@ -48,15 +48,15 @@ A chunk is accepted only if it was requested and has the expected size. The rece
 
 The final reconstructed resource must match the advertised SHA-256 content ID before it is offered for saving. A file that does not match is discarded.
 
-## Location storage (HTTP)
+## Location storage (edge function)
 
-The signaling server exposes three routes for each device's last known location. All accept JSON bodies up to 4 KB, return JSON, and allow CORS from any origin.
+The `device-location` edge function stores each device's last known location. It is called at `/functions/v1/device-location/<action>` with the project's public anon key, and accepts JSON bodies. It allows CORS from any origin.
 
-- `POST /api/device-location/save` with `{ deviceKey, location }`, where `location` is `{ latitude, longitude, accuracy, capturedAt }`. Returns `{ ok: true }`.
-- `POST /api/device-location/load` with `{ deviceKey }`. Returns `{ location }`, which is `null` when nothing is saved.
-- `POST /api/device-location/clear` with `{ deviceKey }`. Returns `{ ok: true }`.
+- `save` with `{ deviceKey, location }`, where `location` is `{ latitude, longitude, accuracy, capturedAt }`. Returns `{ ok: true }`.
+- `load` with `{ deviceKey }`. Returns `{ location }`, which is `null` when nothing is saved.
+- `clear` with `{ deviceKey }`. Returns `{ ok: true }`.
 
-`deviceKey` is a private string of 16 to 128 characters kept in the browser. The server hashes it before it reaches the database, so only the hash is stored. Responses are `400` for invalid input, `502` when the database call fails, and `503` when the server has no database configuration.
+`deviceKey` is a private string of 16 to 128 characters kept in the browser. The function hashes it before it reaches the database, so only the hash is stored. Responses are `400` for invalid input, `502` when the database call fails, and `503` when the function has no database configuration.
 
 ## Future protocol work
 
