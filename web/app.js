@@ -38,6 +38,8 @@ const localResources = [];
 const peers = new Map();
 let signaling = null;
 let localLocation = null;
+let savedLocation = null;
+let locationGeneration = 0;
 let stopWatchingLocation = null;
 const locationMap = createLocationMap(elements.map);
 const locationSaver = createThrottledSaver(persistLocation);
@@ -62,12 +64,13 @@ function refreshViews() {
 
 function mapDevices() {
   const devices = [];
-  if (localLocation) {
+  const ownLocation = localLocation ?? savedLocation;
+  if (ownLocation) {
     devices.push({
       id: localPeerId,
       label: `${displayDeviceId(localPeerId)} (you)`,
       isSelf: true,
-      ...localLocation,
+      ...ownLocation,
     });
   }
   for (const [peerId, entry] of peers) {
@@ -314,16 +317,18 @@ function broadcastLocation() {
 }
 
 async function restoreLastLocation() {
+  const generation = locationGeneration;
   try {
     const saved = await loadLastLocation(deviceKey);
-    if (!saved) return;
+    if (!saved || generation !== locationGeneration) return;
     if (stopWatchingLocation) {
       localLocation ??= saved;
       broadcastLocation();
-      refreshViews();
-      return;
+    } else {
+      savedLocation = saved;
+      elements.locationStatus.textContent = `Last known location saved ${new Date(saved.capturedAt).toLocaleString()}. Sharing is off.`;
     }
-    elements.locationStatus.textContent = `Last known location saved ${new Date(saved.capturedAt).toLocaleString()}. Sharing is off.`;
+    refreshViews();
   } catch (error) {
     if (!stopWatchingLocation) {
       elements.locationStatus.textContent = `Could not load your last known location: ${error.message}`;
@@ -360,7 +365,9 @@ function stopSharingLocation() {
   stopWatchingLocation = null;
   locationSaver.cancel();
   writeSharingPreference(false);
+  locationGeneration += 1;
   localLocation = null;
+  savedLocation = null;
   elements.locationToggle.textContent = "Share my location";
   elements.locationStatus.textContent = "Location sharing is off.";
   broadcastLocation();

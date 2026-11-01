@@ -28,7 +28,16 @@ function locationApiUrl(action) {
   return `${SUPABASE_URL}/functions/v1/device-location/${action}`;
 }
 
-async function postLocationRequest(action, body) {
+let requestQueue = Promise.resolve();
+
+// Requests run in order so an earlier save cannot land after a later clear.
+function postLocationRequest(action, body) {
+  const request = requestQueue.then(() => sendLocationRequest(action, body));
+  requestQueue = request.catch(() => {});
+  return request;
+}
+
+async function sendLocationRequest(action, body) {
   if (!SUPABASE_URL || !SUPABASE_ANON_KEY) throw new Error("Location storage is not configured.");
   const response = await fetch(locationApiUrl(action), {
     method: "POST",
