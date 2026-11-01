@@ -1,32 +1,42 @@
 <!doctype html>
 <html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Peddle iLabs MeshNet</title>
-  <link rel="stylesheet" href="./style.css">
-</head>
-<body>
-  <main>
-    <h1>Peddle iLabs MeshNet</h1>
-    <p>Peer-to-peer learning resource distribution.</p>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Peddle iLabs MeshNet</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>Peddle iLabs MeshNet</h1>
+        <p>Find nearby devices and see which learning resources they hold.</p>
+      </header>
 
-    <section class="card">
-      <label>Room <input id="room" value="meshnet-demo"></label>
-      <button id="join">Join network</button>
-      <p id="status">Disconnected</p>
-    </section>
+      <section class="card" aria-labelledby="network-title">
+        <h2 id="network-title">Network</h2>
+        <p>Devices in the same room connect directly. The signaling server only helps them find each other.</p>
+        <div class="row">
+          <label>Room <input id="room" value="meshnet-demo" autocomplete="off" /></label>
+          <button id="join" type="button">Join network</button>
+        </div>
+        <p id="status" class="status" role="status">Disconnected.</p>
+        <p class="meta">This device: <code id="device-id">-</code></p>
+      </section>
 
-    <section class="card">
-      <h2>Peers</h2>
-      <ul id="peers"></ul>
-    </section>
+      <section class="card" aria-labelledby="share-title">
+        <h2 id="share-title">Share a file</h2>
+        <p>The file is fingerprinted on this device. For now, connected devices receive its name, size, and fingerprint only.</p>
+        <label class="file-input">Choose file <input id="share" type="file" /></label>
+        <p id="share-status" class="meta" role="status"></p>
+        <ul id="local-resources" class="list"></ul>
+      </section>
 
-    <section class="card">
-      <h2>Resources</h2>
-      <p>This interface is the v0.4 shell. Resource discovery, cache and transfer modules are documented in the protocol layer.</p>
-    </section>
-  </main>
-  <script src="./app.js"></script>
-</body>
+      <section class="card" aria-labelledby="devices-title">
+        <h2 id="devices-title">Devices</h2>
+        <ul id="peers" class="list"></ul>
+      </section>
+    </main>
+    <script type="module" src="./app.js"></script>
+  </body>
 </html>

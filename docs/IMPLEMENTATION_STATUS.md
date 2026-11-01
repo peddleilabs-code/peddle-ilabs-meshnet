@@ -1,49 +1,48 @@
 # Implementation Status
 
-Audit of the repository as it stood before the v0.5 work. Each item was checked against the code, not against the version documentation.
+Current state of the repository, checked against the code.
 
 ## Implemented
 
-- **Signaling server** (`server/server.js`): HTTP `GET /health` returns `{ ok, service, version }`.
-- **Room join and presence**: clients join a room with a peer ID; existing members are reported to the newcomer and the newcomer is announced to existing members; `peer-left` is sent on disconnect.
-- **SDP and ICE relay**: `offer`, `answer` and `ice` messages are forwarded to a named peer in the same room. Verified with a two-client smoke test.
-- **Static web shell** (`web/`): a page with a room field, a join button, a status line and a peer list populated from signaling messages.
+- **Signaling server** (`server/server.js`): HTTP `GET /health`; room join and presence; `peer-left` on disconnect; `offer`, `answer` and `ice` relay to a named peer in the same room.
+- **Direct device connection** (`web/meshPeerConnection.js`): one WebRTC data channel per pair of devices, set up over the signaling server. Connection states are DISCOVERING, CONNECTING, CONNECTED, DISCONNECTED and FAILED. A connection that does not open within 20 seconds fails.
+- **Typed messages and validation** (`web/protocol.js`): every incoming data-channel message and signaling message is size-checked and validated before use. Unknown fields are dropped.
+- **Resource model** (`web/resourceModel.js`): a file shared on this device is fingerprinted with SHA-256 (`sha256:<hex>`) and described with title, MIME type, size, chunk size and chunk count.
+- **Manifest exchange**: when two devices connect, each sends the list of resources it shares. Received lists are shown as unverified, because file contents are not transferred yet.
+- **Web client** (`web/`): join a room, see connected devices and their state, share a file, see the list of shared files.
+- **Tests** (`tests/`, run with `npm test`): 22 unit tests cover content IDs, chunk math, MIME normalization, message and signal validation, and the connection state machine using a fake WebRTC connection.
 
 ## Partially implemented
 
-- **Peer discovery**: presence works, but the peer ID is supplied by the client, is not validated, and is not persisted. Any client can claim any ID.
-- **Device identity**: the web client generates a random UUID on every page load. Nothing is persisted, so identity changes on refresh.
-- **Health endpoint**: exists, but reports no real state (room count, peer count, uptime).
+- **Peer discovery**: the peer ID is supplied by the client and is not validated by the server. Any client can claim any ID.
+- **Device identity**: a random ID is generated on each page load and is not saved, so the identity changes on refresh.
+- **Signaling port**: the web client connects to port `8080` on the same host. Serving the page from another origin or behind a proxy will not work.
+- **Health endpoint**: returns only the service name and version, not room or peer counts.
+- **Reconnection**: a connection that fails or drops is not retried automatically. A device must leave and rejoin.
 
-## Broken
+## Not yet verified
 
-- **Server startup and port**: the web client hard-codes port `8080` and the server defaults to it. Serving the web app from any other origin or proxy fails silently.
-- **Error handling in the client**: `JSON.parse` on incoming messages is not wrapped; a malformed message stops the handler.
-- **Offer/answer relay trusts input**: the server forwards arbitrary JSON, adds a `from` field, and does not check message size, rate, or room membership beyond the room lookup.
-- **Documentation overstates the code**: `docs/ARCHITECTURE.md`, `docs/PROTOCOL.md`, `docs/VERSION_HISTORY.md` and the v0.3/v0.4 READMEs describe WebRTC data channels, chunked transfer, missing-chunk requests, IndexedDB cache, SHA-256 verification and store-and-forward. None of this exists in the code.
+- The direct connection and manifest exchange have been unit tested with a fake WebRTC layer only. No real two-browser session has been run, because this environment has no browser.
 
 ## Missing
 
-- **WebRTC connection manager**: no `RTCPeerConnection` anywhere in the web client. Peers are listed but never connected.
-- **Data channels and message protocol**: no typed messages, no validation of peer-supplied JSON.
-- **Resource model and content IDs**: no resource type, no SHA-256 hashing, no manifests.
-- **Resource library and local cache**: the Resources section is static text. No IndexedDB usage.
-- **Chunking, resumable transfers, verification, transfer manager**: none.
-- **Store-and-forward and re-advertisement**: none.
-- **Learning layer, recommendation engine, progress tracking**: none.
-- **Power/SchoolBox abstractions, telemetry, i18n, dashboards**: none.
-- **Live device location and map**: none.
-- **Tests**: `tests/` contains only a README listing intended tests. No test runner is configured.
-- **Build tooling**: no root `package.json`, no Vite, no TypeScript, no Dockerfile, no `.env.example`. The root `package-lock.json` is an empty stub.
-- **Deployment**: no Docker files or production configuration.
+- **Resource transfer**: no chunk requests, no chunk transfer, no verification of received contents against the declared SHA-256.
+- **Local cache**: nothing is stored. Shared files exist only while the page is open.
+- **Store-and-forward**: devices do not re-advertise resources they received.
+- **STUN and TURN**: connections use only addresses on the same network. Devices on different networks cannot connect yet.
+- **Server-side validation**: the signaling server forwards arbitrary JSON, does not limit message size, and does not check sender identity beyond the room.
+- **Learning features**: recommendations, progress tracking, and dashboards.
+- **Location features**: live device location and map.
+- **Build and deployment**: no Vite build, no TypeScript, no Dockerfile, no `.env.example`.
+- **Documentation**: `docs/ARCHITECTURE.md`, `docs/PROTOCOL.md`, `docs/VERSION_HISTORY.md` and the v0.3 and v0.4 READMEs still describe features that are not built yet.
 
 ## Errors recorded during audit
 
-- `server/` had no installed dependencies; `npm install` in `server/` now succeeds (express 4.x, ws 8.x).
+- `server/` had no installed dependencies; `npm install` now succeeds (express 4.x, ws 8.x).
 - `node --check server/server.js` passes on Node v22.23.1.
 - Signaling smoke test (two clients, join, presence, offer relay, health) passes.
-- No web client test was run: the environment has no browser, so the page was only read, not exercised.
+- The incoming-message parsing in the web client was not guarded; it now is.
 
-## Planned
+## Next steps
 
-Work follows the phase order in the master development prompt, starting with the core data models and typed protocol, then the WebRTC connection manager and the transfer and cache layers. The live location feature is planned after the peer dashboard, per the prompt's implementation order.
+Resource transfer over the existing data channel, with chunked requests and SHA-256 verification before a file is stored. After that: a local cache, STUN/TURN configuration for connections across networks, and server-side validation of signaling messages.
